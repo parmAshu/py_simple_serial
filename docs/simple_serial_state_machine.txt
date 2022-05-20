@@ -1,0 +1,53 @@
+@startuml SIMPLE_SERIAL_PARSING_STATE_MACHINE
+
+state PREAMBLE_WAIT
+
+state VERSION_WAIT
+
+state TITLE_WAIT
+
+state LENGTH_WAIT
+
+state MESSAGE_WAIT
+
+state END_WAIT
+
+[*] -> PREAMBLE_WAIT : DO : Initialize 'MSG', 'buff0' and 'buff1'
+
+PREAMBLE_WAIT -> PREAMBLE_WAIT : Invalid Preamble Byte, DO : byte to buff1
+
+PREAMBLE_WAIT --> VERSION_WAIT : Preamble Byte, DO : byte to buff0
+
+VERSION_WAIT --> PREAMBLE_WAIT : Invalid Version Bytes, DO : byte to buff0 then copy buff0 to buff1
+
+VERSION_WAIT --> TITLE_WAIT : Valid Version Byte (indicating version 1.0), DO : byte to buff0 then MSG.version = byte
+
+TITLE_WAIT --> PREAMBLE_WAIT : Invalid Title Byte, DO : byte to buff0 then copy buff0 to buff1
+
+TITLE_WAIT --> LENGTH_WAIT : Valid Title Byte, DO : byte to buff0 then MSG.title = byte
+
+LENGTH_WAIT --> PREAMBLE_WAIT : Invalid Length Byte, DO : byte to buff0 then copy buff0 to buff1
+
+LENGTH_WAIT --> END_WAIT : Length byte is 0,  DO : byte to buff0 then MSG.len = 0
+
+LENGTH_WAIT --> MESSAGE_WAIT : Other length byte, DO : byte to buff0 then MSG.len = byte
+
+MESSAGE_WAIT --> MESSAGE_WAIT : Data byte, DO : byte to buff0 then push byte into MSG.message then received_bytes++, COND : received_bytes < MSG.len
+
+MESSAGE_WAIT --> END_WAIT : Data byte, DO : byte to buff0 then push byte into MSG.message then received_bytes++, COND : received_bytes == MSG.len
+
+END_WAIT --> PREAMBLE_WAIT : Valid End Byte, DO : save MSG
+
+END_WAIT --> PREAMBLE_WAIT : Invalid End Byte, DO : byte to buff0, copy buff0 into buff1
+
+VERSION_WAIT --> PREAMBLE_WAIT : Reset Signal (forced or timeout), DO : copy buff0 into buff1
+
+TITLE_WAIT --> PREAMBLE_WAIT : Reset Signal (forced or timeout), DO : copy buff0 into buff1
+
+LENGTH_WAIT --> PREAMBLE_WAIT : Reset Signal (forced or timeout), DO : copy buff0 into buff1
+
+MESSAGE_WAIT --> PREAMBLE_WAIT : Reset Signal (forced or timeout), DO : copy buff0 into buff1
+
+END_WAIT --> PREAMBLE_WAIT : Reset Signal (forced or timeout), DO : copy buff0 into buff1
+
+@enduml

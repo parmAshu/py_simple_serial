@@ -101,12 +101,12 @@ def SERIAL_PARITY(parity):
 class simpleSerialDevice:
 
     # Change arguments to **kwargs
-    def __init__( self, _port, _baudrate = 115200, _stop_bits = 1, _parity = "None" ):
+    def __init__( self, _port, _baudrate = 115200, _stop_bits = 1, _parity = "None", packet_timeout = 0.5 ):
         """This is the class constructor
 
         Args:
-            _port (str): The port which the device is connected to
-            _baudrate (int): The baudrate for serial communication with the Device. Defaults to 115200.
+            _port (str): The port which the HIL I2C device is connected to
+            _baudrate (int): The baudrate for serial communication with HIL I2C Device. Defaults to 115200.
             _stop_bits (int): Stop bits. Defaults to 1.
             _parity (str): Parity - Even or Odd. Defaults to "None".
         """
@@ -125,12 +125,13 @@ class simpleSerialDevice:
         self.__DEVICE.stopbits = int(self.__STOP_BITS)
         self.__DEVICE.parity = SERIAL_PARITY( self.__PARITY )
 
-        self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_PREABLE"
+        self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_PREAMBLE"
         self.__SIMPLE_SERIAL_PACKET_END_TIME = 0
         self.__RECV_MSG = { "title" : 0, "length" : 0, "message" : b'' }
+        self.__PACKET_TIMEOUT = packet_timeout
 
     def connect(self):
-        """This function is used to connect to the Device over serial port.
+        """This function is used to connect to thd HIL I2C Device over serial port.
         """
         self.__DEVICE.open()
 
@@ -144,17 +145,18 @@ class simpleSerialDevice:
         byt = self.__DEVICE.read(1)
 
         # Add condition to verify if a byte is received
-        if True:
+        if len(byt) == 1:
+            #print( byt )
             if self.__SIMPLE_SERIAL_SCAN_STATE == "SIMPLE_SERIAL_PREAMBLE":
-                
                 # If the preamble byte is received, go to next state
+                #print( "waiting for preamble" )
                 if byt == SIMPLE_SERIAL_PREAMBLE_BYTE:
-                    self.__SIMPLE_SERIAL_PACKET_END_TIME = time.time() + self.__TIMEOUT
+                    self.__SIMPLE_SERIAL_PACKET_END_TIME = time.time() + self.__PACKET_TIMEOUT
                     self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_VERSION"
 
             elif self.__SIMPLE_SERIAL_SCAN_STATE == "SIMPLE_SERIAL_VERSION":
-
                 # If the version byte indicates version 1 then, move ahead
+                #print( "waiting for version" )
                 if byt == SIMPLE_SERIAL_VERSION_1:
                     self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_TITLE"
                 # Otherwise, go back to preamble scan
@@ -162,44 +164,41 @@ class simpleSerialDevice:
                     self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_PREAMBLE"
 
             elif self.__SIMPLE_SERIAL_SCAN_STATE == "SIMPLE_SERIAL_TITLE":
-
                 # Get the title as integer
+                #print( "waiting for title")
                 self.__RECV_MSG["title"] = int.from_bytes( byt, "little" )
                 self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_LENGTH"
 
             elif self.__SIMPLE_SERIAL_SCAN_STATE == "SIMPLE_SERIAL_LENGTH":
-
                 # Empty the message buffer
+                #print( "waiting for length" )
                 self.__RECV_MSG["message"] = b''
-
                 # Save the message length in bytes
                 self.__RECV_MSG["length"] = int.from_bytes( byt, "little" )
-
-                recv_num_bytes = 0
-
+                self.recv_num_bytes = 0
                 # If the length of message is 0 go to end scan
                 if self.__RECV_MSG["length"] == 0:
-                    __SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_END"
+                    self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_END"
                 else:
-                    __SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_MESSAGE"
+                    self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_MESSAGE"
 
-            elif __SIMPLE_SERIAL_SCAN_STATE == "SIMPLE_SERIAL_MESSAGE":
-
+            elif self.__SIMPLE_SERIAL_SCAN_STATE == "SIMPLE_SERIAL_MESSAGE":
+                #print( "waiting for message" )
                 self.__RECV_MSG["message"] += byt
-                recv_num_bytes += 1
+                self.recv_num_bytes += 1
+                if self.recv_num_bytes == self.__RECV_MSG["length"]:
+                    self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_END"
 
-                if recv_num_bytes == self.__RECV_MSG["length"]:
-                    __SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_END"
-
-            elif __SIMPLE_SERIAL_SCAN_STATE == "SIMPLE_SERIAL_END":
-                
+            elif self.__SIMPLE_SERIAL_SCAN_STATE == "SIMPLE_SERIAL_END":
+                #print( "waiting for eof" )
+                self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_PREAMBLE"
                 if byt == SIMPLE_SERIAL_FRAME_END:
-                   # self.__RECV_NUM_MSG += 1
+                    #self.__RECV_NUM_MSG += 1
+                    #print( self.__RECV_MSG )
                     return self.__RECV_MSG
-                
-                __SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_PREAMBLE"
 
-            if self.__SIMPLE_SERIAL_SCAN_STATE != "SIMPLE_SERIAL_PREAMBLE" and self.__SIMPLE_SERIAL_PACKET_END_TIME > time.time() :
+            if self.__SIMPLE_SERIAL_SCAN_STATE != "SIMPLE_SERIAL_PREAMBLE" and time.time() >= self.__SIMPLE_SERIAL_PACKET_END_TIME:
+                #print( "packet timed out" )
                 self.__SIMPLE_SERIAL_SCAN_STATE = "SIMPLE_SERIAL_PREAMBLE"
                 return
             else:
@@ -217,15 +216,12 @@ class simpleSerialDevice:
             msg (dict): A dictionary containing simple serial message fields
             _timeout (int, optional): Timeout for send operation in seconds. Defaults to LOCK_TIMEOUT.
         """
-        
         msg["length"] = len(msg["message"])
-        
         if msg["version"] ==  "1":
-
             bytes_to_send = b''
             bytes_to_send += SIMPLE_SERIAL_PREAMBLE_BYTE + SIMPLE_SERIAL_VERSION_1 + msg["title"].to_bytes(1, 'little') + msg["length"].to_bytes(1, 'little') + msg["message"] + SIMPLE_SERIAL_FRAME_END
-            
-            self.__DEVICE.write( bytes_to_send, timeout = _timeout )
+            #print( bytes_to_send )
+            self.__DEVICE.write( bytes_to_send )
 
     def disconnect(self):
         """This function is used to disconnect from simple serial device.

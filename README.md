@@ -5,9 +5,9 @@ This is a python package to communicate with a device using simple serial over u
 ---
 ## Module Reference
 
-`class py_simple_serial.simpleSerial`
+### class py_simple_serial.simpleSerial
 
-```__init__( self, _port, _baudrate = 115200, _stop_bits = 1, _parity = "None", packet_timeout = 0.5 )```
+### __init__( self, _port, _baudrate = 115200, _stop_bits = 1, _parity = "None", packet_timeout = 0.5 )
 
 This is the class constructor.
 
@@ -19,11 +19,11 @@ This is the class constructor.
 * _parity : String representing parity - "None", "Odd" or "Even". The default value is "None".
 * packet_timeout : This is the time in seconds within which a valid simple serial packet must be received. The default value is 0.5 seconds.
 
-```connect()```
+### connect()
 
 This function is used to connect to the serial device. This function must be called before using any other function.
 
-```recv()```
+### recv()
 
 This function is used to receive a simple serial frame from the connected device. This function is used for polling for received simple serial messages.
 
@@ -39,7 +39,7 @@ The function returns `None` if no simple serial message is available. If a simpl
 }
 ```
 
-```send_message( self, msg, _timeout = LOCK_TIMEOUT )```
+### send_message( self, msg, _timeout = LOCK_TIMEOUT )
 
 This function is used to send a simple serial message to the connected device.
 
@@ -57,7 +57,7 @@ This function is used to send a simple serial message to the connected device.
 
 * _timeout : It is the time in seconds within which the transmit operation must get completed.
 
-```disconnect()```
+### disconnect()
 
 This function is used to disconnect the device.
 

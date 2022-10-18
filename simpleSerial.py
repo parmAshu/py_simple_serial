@@ -6,7 +6,7 @@ import serial, serial.tools.list_ports
 LOCK_TIMEOUT = 2
 
 # Constant to define simple serial preamble byte
-SIMPLE_SERIAL_PREAMBLE_BYTE = b'\xAA'
+SIMPLE_SERIAL_PREAMBLE_BYTE = b'\x0D'
 
 # Constant to define simple serial version 1 byte
 SIMPLE_SERIAL_VERSION_1 = b'\x01'

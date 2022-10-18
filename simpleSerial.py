@@ -135,6 +135,10 @@ class simpleSerialDevice:
         """
         self.__DEVICE.open()
 
+    def flush(self):
+        self.__DEVICE.reset_input_buffer()
+        self.__DEVICE.reset_output_buffer()
+
     def recv(self):
         """This function to receive a simple serial message from connected device. It must be called periodically for scanning for messages.
 
